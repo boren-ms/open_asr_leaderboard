@@ -204,8 +204,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--device",
-        type=int,
-        default=-1,
+        type=str,
+        default="cuda:0",
         help="The device to run the pipeline on. -1 for CPU (default), 0 for the first GPU and so on.",
     )
     parser.add_argument(
