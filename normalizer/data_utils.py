@@ -1,7 +1,10 @@
+import re
+
+import num2words
 from datasets import load_dataset, Audio
 from normalizer import EnglishTextNormalizer, BasicMultilingualTextNormalizer
 
-from .eval_utils import read_manifest, write_manifest
+from .eval_utils import read_manifest, write_manifest, normalize_compound_pairs
 
 
 def is_target_text_in_range(ref):
@@ -9,6 +12,31 @@ def is_target_text_in_range(ref):
         return False
     else:
         return ref.strip() != ""
+
+
+class MultilingualNormalizer(BasicMultilingualTextNormalizer):
+    """BasicMultilingualTextNormalizer with optional number normalization.
+
+    Call with just text for standard normalization (backward-compatible).
+    Pass lang= to also convert digits to words via num2words.
+    """
+
+    def _normalize_numbers(self, text, lang):
+        # Join space-separated thousand groups (e.g. "10 000" -> "10000")
+        text = re.sub(r"(\d)\s+(\d{3})\b", r"\1\2", text)
+        # Convert remaining digit sequences to words
+        def _replace(m):
+            try:
+                return num2words.num2words(int(m.group()), lang=lang)
+            except Exception:
+                return m.group()
+        return re.sub(r"\d+", _replace, text)
+
+    def __call__(self, s, lang=None):
+        s = super().__call__(s)
+        if lang is not None:
+            s = self._normalize_numbers(s, lang)
+        return s
 
 
 def get_text(sample):
@@ -30,7 +58,7 @@ def get_text(sample):
 
 normalizer = EnglishTextNormalizer()
 
-ml_normalizer = BasicMultilingualTextNormalizer()
+ml_normalizer = MultilingualNormalizer(remove_diacritics=False)
 
 
 def normalize(batch):
@@ -50,12 +78,11 @@ def load_data(args):
 
     return dataset
 
-def prepare_data(dataset):
-    # Re-sample to 16kHz and normalise transcriptions
-    dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
-    # Use writer_batch_size=1 to avoid pyarrow offset overflow with large audio blobs
-    dataset = dataset.map(normalize, writer_batch_size=1)
-    dataset = dataset.filter(is_target_text_in_range, input_columns=["norm_text"], writer_batch_size=1)
+def prepare_data(dataset, sampling_rate=16000):
+    # Re-sample and normalise transcriptions
+    dataset = dataset.cast_column("audio", Audio(sampling_rate=sampling_rate))
+    dataset = dataset.map(normalize)
+    dataset = dataset.filter(is_target_text_in_range, input_columns=["norm_text"])
 
     return dataset
 

@@ -7,7 +7,7 @@ export PYTHONPATH="..":$PYTHONPATH
 
 # Configuration
 MODEL_IDs=(
-    "openai/whisper-large-v3"
+    # "openai/whisper-large-v3"
     "openai/whisper-large-v3-turbo"
 )
 
@@ -44,6 +44,7 @@ run_evaluation() {
         --model_id="$model_id" \
         --dataset="$DATASETS" \
         --config_name="$config_name" \
+        --language="$language" \
         --split="test" \
         --device="$DEVICE_ID" \
         --batch_size="$BATCH_SIZE" \
@@ -97,7 +98,7 @@ for MODEL_ID in "${MODEL_IDs[@]}"; do
     # Evaluate results
     RUNDIR=`pwd`
     cd ../normalizer
-    python -c "import eval_utils; eval_utils.score_results('${RUNDIR}/results', '${MODEL_ID}')"
+    python -c "import eval_utils; eval_utils.score_results('${RUNDIR}/results', '${MODEL_ID}', multilingual=True)"
     cd "$RUNDIR"
 
     echo ""
